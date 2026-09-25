@@ -307,6 +307,8 @@
           '<div class="group-title">Group ' + (i + 1) + '</div>' +
           '<label>Booking name</label>' +
           '<input type="text" class="g-name" placeholder="e.g. Smith Family" value="' + escapeAttr(g.name || '') + '">' +
+          '<label>Contact number</label>' +
+          '<input type="tel" class="g-contact" placeholder="e.g. 021 555 1234" value="' + escapeAttr(g.contact || '') + '">' +
           '<div class="grid2">' +
             '<div><label>People in group</label>' +
               '<input type="number" min="0" class="g-people" placeholder="0" value="' + (g.people != null ? g.people : '') + '"></div>' +
@@ -326,6 +328,7 @@
       blocks.forEach(function (b) {
         groups.push({
           name: b.querySelector('.g-name').value.trim(),
+          contact: b.querySelector('.g-contact').value.trim(),
           people: Number(b.querySelector('.g-people').value) || 0,
           rods: Number(b.querySelector('.g-rods').value) || 0,
           balance: Number(b.querySelector('.g-balance').value) || 0
@@ -341,7 +344,9 @@
     }
 
     groupCountEl.addEventListener('change', function () {
-      renderGroupBlocks(Number(groupCountEl.value) || 0);
+      var newCount = Number(groupCountEl.value) || 0;
+      var existing = collectGroups(); // keep whatever is already filled in
+      renderGroupBlocks(newCount, existing);
     });
     tripDateEl.addEventListener('change', updateSaveEnabled);
     groupsContainer.addEventListener('input', updateSaveEnabled);
@@ -416,7 +421,7 @@
     function openDetailModal(trip) {
       var groups = trip.groups || [];
       var rowsHtml = groups.map(function (g) {
-        return '<div><strong>' + escapeHtml(g.name) + '</strong> — ' + g.people + ' people, ' + g.rods + ' rods, ' + fmtMoney(g.balance) + ' outstanding</div>';
+        return '<div><strong>' + escapeHtml(g.name) + '</strong>' + (g.contact ? ' (' + escapeHtml(g.contact) + ')' : '') + ' — ' + g.people + ' people, ' + g.rods + ' rods, ' + fmtMoney(g.balance) + ' outstanding</div>';
       }).join('');
 
       var backdrop = document.createElement('div');
