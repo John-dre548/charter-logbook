@@ -1,0 +1,495 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Charter Logbook</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<style>
+  :root {
+    --bg: #f5f7f6;
+    --card: #ffffff;
+    --ink: #16241f;
+    --sub: #5a6b64;
+    --line: #e1e7e4;
+    --brand: #0e6e52;
+    --brand-dark: #0a5540;
+    --brand-light: #e6f3ee;
+    --danger: #b3423a;
+    --danger-light: #fbeceb;
+    --radius: 12px;
+    box-sizing: border-box;
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #0f1613; --card: #16211c; --ink: #e9f1ec; --sub: #9db2a9;
+      --line: #263229; --brand: #2ea37c; --brand-dark: #56c199;
+      --brand-light: #16332a; --danger: #e2857c; --danger-light: #351f1d;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #0f1613; --card: #16211c; --ink: #e9f1ec; --sub: #9db2a9;
+    --line: #263229; --brand: #2ea37c; --brand-dark: #56c199;
+    --brand-light: #16332a; --danger: #e2857c; --danger-light: #351f1d;
+  }
+  html { scroll-padding-top: env(safe-area-inset-top, 0px); }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    min-height: 100%;
+  }
+  .wrap { max-width: 760px; margin: 0 auto; padding: 20px 16px 56px; }
+  header { display: flex; align-items: center; gap: 10px; margin-bottom: 6px; }
+  header .icon { font-size: 26px; }
+  h1 { font-size: 20px; margin: 0; }
+  .status { font-size: 12px; color: var(--sub); margin-left: auto; text-align: right; }
+  .subnote { font-size: 12px; color: var(--sub); margin: 0 0 18px; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); padding: 16px; margin-bottom: 16px; }
+  .card h2 { font-size: 15px; margin: 0 0 12px; color: var(--sub); text-transform: uppercase; letter-spacing: 0.04em; }
+  label { display: block; font-size: 13px; color: var(--sub); margin-bottom: 4px; margin-top: 12px; }
+  label:first-of-type { margin-top: 0; }
+  input[type="date"], input[type="text"], input[type="number"], input[type="password"], select, textarea {
+    width: 100%; padding: 10px 12px; border: 1px solid var(--line); border-radius: 8px;
+    background: var(--bg); color: var(--ink); font-size: 15px; font-family: inherit; resize: vertical;
+  }
+  input:focus, select:focus, textarea:focus { outline: 2px solid var(--brand); outline-offset: -1px; }
+  .group-block { border: 1px solid var(--line); border-radius: 10px; padding: 12px; margin-top: 12px; background: var(--bg); }
+  .group-block .group-title { font-size: 13px; font-weight: 600; color: var(--brand-dark); margin-bottom: 4px; }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 0 10px; }
+  .grid2 > div { min-width: 0; }
+  button { font-family: inherit; font-size: 14px; border-radius: 8px; border: none; padding: 11px 16px; cursor: pointer; }
+  .btn-primary { background: var(--brand); color: #fff; width: 100%; margin-top: 16px; font-weight: 600; }
+  .btn-primary:active { background: var(--brand-dark); }
+  .btn-primary:disabled { opacity: 0.5; cursor: default; }
+  .btn-secondary { background: var(--brand-light); color: var(--brand-dark); }
+  .btn-danger-outline { background: var(--danger-light); color: var(--danger); }
+  .btn-ghost { background: transparent; color: var(--sub); border: 1px solid var(--line); }
+  .row-actions { display: flex; gap: 8px; margin-top: 6px; }
+  .search-row { display: flex; gap: 8px; align-items: center; }
+  .search-row input { flex: 1; }
+  .trip-item { border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; margin-bottom: 10px; cursor: pointer; }
+  .trip-item:active { background: var(--brand-light); }
+  .trip-top { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; }
+  .trip-date { font-weight: 700; font-size: 15px; }
+  .trip-meta { font-size: 12px; color: var(--sub); }
+  .trip-balance { font-size: 13px; font-weight: 600; }
+  .trip-balance.owing { color: var(--danger); }
+  .trip-balance.clear { color: var(--brand); }
+  .detail-groups { margin-top: 8px; font-size: 13px; color: var(--sub); }
+  .detail-groups div { padding: 3px 0; border-top: 1px dashed var(--line); }
+  .detail-groups div:first-child { border-top: none; }
+  .empty { text-align: center; color: var(--sub); font-size: 14px; padding: 30px 10px; }
+  .modal-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,0.45); display: flex; align-items: flex-end; justify-content: center; z-index: 20; }
+  .modal { background: var(--card); width: 100%; max-width: 760px; border-radius: 16px 16px 0 0; padding: 20px 16px calc(20px + env(safe-area-inset-bottom, 0px)); max-height: 85vh; overflow-y: auto; }
+  .modal h2 { font-size: 17px; margin: 0 0 14px; }
+  .close-x { position: absolute; top: 14px; right: 16px; font-size: 20px; color: var(--sub); background: none; border: none; cursor: pointer; padding: 4px; }
+  .toast { position: fixed; bottom: calc(20px + env(safe-area-inset-bottom, 0px)); left: 50%; transform: translateX(-50%); background: var(--brand-dark); color: #fff; padding: 10px 18px; border-radius: 20px; font-size: 13px; z-index: 30; opacity: 0; transition: opacity 0.25s; pointer-events: none; }
+  .toast.show { opacity: 1; }
+
+  /* Lock screen */
+  #lockScreen {
+    position: fixed; inset: 0; background: var(--bg); z-index: 50;
+    display: flex; align-items: center; justify-content: center; padding: 20px;
+  }
+  .lock-card {
+    background: var(--card); border: 1px solid var(--line); border-radius: 16px;
+    padding: 28px 24px; width: 100%; max-width: 340px; text-align: center;
+  }
+  .lock-card .icon { font-size: 34px; margin-bottom: 8px; }
+  .lock-card h1 { font-size: 18px; margin: 0 0 4px; }
+  .lock-card p { font-size: 13px; color: var(--sub); margin: 0 0 18px; }
+  .lock-error { color: var(--danger); font-size: 13px; margin-top: 10px; min-height: 16px; }
+  #app { display: none; }
+</style>
+</head>
+<body>
+
+<div id="lockScreen">
+  <div class="lock-card">
+    <div class="icon">🔒</div>
+    <h1>Charter Logbook</h1>
+    <p>Enter the password to continue</p>
+    <input type="password" id="passwordInput" placeholder="Password" autocomplete="current-password">
+    <button class="btn-primary" id="unlockBtn">Unlock</button>
+    <div class="lock-error" id="lockError"></div>
+  </div>
+</div>
+
+<div id="app">
+<div class="wrap">
+  <header>
+    <span class="icon">🎣</span>
+    <h1>Charter Logbook</h1>
+    <span class="status" id="status">connecting…</span>
+  </header>
+  <p class="subnote">Synced through your private database — open this same link and password on any device.</p>
+
+  <div class="card">
+    <h2>New Trip Entry</h2>
+    <label for="tripDate">Date of trip</label>
+    <input type="date" id="tripDate">
+
+    <label for="groupCount">Number of groups</label>
+    <select id="groupCount">
+      <option value="">Select…</option>
+    </select>
+
+    <div id="groupsContainer"></div>
+
+    <label for="tripNotes">Notes for this trip</label>
+    <textarea id="tripNotes" rows="3" placeholder="Weather, catch report, anything worth remembering…"></textarea>
+
+    <button class="btn-primary" id="saveBtn" disabled>Save Trip</button>
+  </div>
+
+  <div class="card">
+    <h2>All Trips</h2>
+    <div class="search-row">
+      <input type="date" id="searchDate" placeholder="Search by date">
+      <button class="btn-ghost" id="clearSearch">Clear</button>
+    </div>
+    <div id="tripList" style="margin-top:14px;">
+      <div class="empty">Loading…</div>
+    </div>
+  </div>
+</div>
+</div>
+
+<div id="modalRoot"></div>
+<div class="toast" id="toast"></div>
+
+<script>
+(function () {
+  // ---- config ----
+  var SUPABASE_URL = "https://gxvdpzbphckuvundsorf.supabase.co";
+  var SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imd4dmRwemJwaGNrdXZ1bmRzb3JmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTAzMTM5MzYsImV4cCI6MjEwNTg4OTkzNn0.egTykZ3QcCKr5sUGC9jpk41vxvZXfvwMdMO9ypkkURs";
+  // SHA-256 hash of the shared password — the raw password is never stored in this file.
+  var PASSWORD_HASH = "75d50dde402ca63ce4e1456ea2afa008c33ea3aa72d7ec8755f38bf88db5b474";
+  var SESSION_KEY = "charterLogbook.unlocked.v1";
+  var MAX_GROUPS = 10;
+
+  var supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+  var allTrips = [];
+
+  // ---- lock screen ----
+  var lockScreen = document.getElementById('lockScreen');
+  var appRoot = document.getElementById('app');
+  var passwordInput = document.getElementById('passwordInput');
+  var unlockBtn = document.getElementById('unlockBtn');
+  var lockError = document.getElementById('lockError');
+
+  async function sha256Hex(text) {
+    var enc = new TextEncoder().encode(text);
+    var buf = await crypto.subtle.digest('SHA-256', enc);
+    var bytes = Array.from(new Uint8Array(buf));
+    return bytes.map(function (b) { return b.toString(16).padStart(2, '0'); }).join('');
+  }
+
+  async function attemptUnlock() {
+    var val = passwordInput.value;
+    if (!val) return;
+    var hash = await sha256Hex(val);
+    if (hash === PASSWORD_HASH) {
+      try { sessionStorage.setItem(SESSION_KEY, '1'); } catch (e) {}
+      showApp();
+    } else {
+      lockError.textContent = 'Incorrect password.';
+      passwordInput.value = '';
+      passwordInput.focus();
+    }
+  }
+
+  function showApp() {
+    lockScreen.style.display = 'none';
+    appRoot.style.display = 'block';
+    initApp();
+  }
+
+  unlockBtn.addEventListener('click', attemptUnlock);
+  passwordInput.addEventListener('keydown', function (e) { if (e.key === 'Enter') attemptUnlock(); });
+
+  var alreadyUnlocked = false;
+  try { alreadyUnlocked = sessionStorage.getItem(SESSION_KEY) === '1'; } catch (e) {}
+  if (alreadyUnlocked) {
+    showApp();
+  } else {
+    passwordInput.focus();
+  }
+
+  // ---- main app (runs once unlocked) ----
+  function initApp() {
+    var statusEl = document.getElementById('status');
+    var tripDateEl = document.getElementById('tripDate');
+    var tripNotesEl = document.getElementById('tripNotes');
+    var groupCountEl = document.getElementById('groupCount');
+    var groupsContainer = document.getElementById('groupsContainer');
+    var saveBtn = document.getElementById('saveBtn');
+    var tripListEl = document.getElementById('tripList');
+    var searchDateEl = document.getElementById('searchDate');
+    var clearSearchBtn = document.getElementById('clearSearch');
+    var modalRoot = document.getElementById('modalRoot');
+    var toastEl = document.getElementById('toast');
+
+    for (var i = 1; i <= MAX_GROUPS; i++) {
+      var opt = document.createElement('option');
+      opt.value = String(i);
+      opt.textContent = i + (i === 1 ? ' group' : ' groups');
+      groupCountEl.appendChild(opt);
+    }
+
+    var todayStr = new Date().toISOString().slice(0, 10);
+    tripDateEl.value = todayStr;
+
+    function showToast(msg) {
+      toastEl.textContent = msg;
+      toastEl.classList.add('show');
+      setTimeout(function () { toastEl.classList.remove('show'); }, 2200);
+    }
+
+    function fmtMoney(n) { return '$' + (Number(n) || 0).toFixed(2); }
+
+    function fmtDateDisplay(dateStr) {
+      if (!dateStr) return '';
+      var parts = dateStr.split('-');
+      if (parts.length !== 3) return dateStr;
+      var d = new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
+      return d.toLocaleDateString(undefined, { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' });
+    }
+
+    function escapeAttr(s) { return String(s).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;'); }
+    function escapeHtml(s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
+
+    function rowToTrip(row) {
+      return {
+        date: row.trip_date,
+        groups: row.groups || [],
+        groupCount: row.group_count,
+        notes: row.notes || '',
+        updatedAt: row.updated_at
+      };
+    }
+
+    // ---- data layer (Supabase) ----
+    async function fetchTrips() {
+      var res = await supabase.from('trips').select('*').order('trip_date', { ascending: false });
+      if (res.error) throw res.error;
+      return (res.data || []).map(rowToTrip);
+    }
+
+    async function upsertTrip(trip) {
+      var res = await supabase.from('trips').upsert({
+        trip_date: trip.date,
+        groups: trip.groups,
+        group_count: trip.groupCount,
+        notes: trip.notes,
+        updated_at: new Date().toISOString()
+      }, { onConflict: 'trip_date' });
+      if (res.error) throw res.error;
+    }
+
+    async function deleteTripRow(date) {
+      var res = await supabase.from('trips').delete().eq('trip_date', date);
+      if (res.error) throw res.error;
+    }
+
+    // ---- form ----
+    function renderGroupBlocks(count, prefill) {
+      groupsContainer.innerHTML = '';
+      for (var i = 0; i < count; i++) {
+        var g = (prefill && prefill[i]) || {};
+        var block = document.createElement('div');
+        block.className = 'group-block';
+        block.dataset.index = String(i);
+        block.innerHTML =
+          '<div class="group-title">Group ' + (i + 1) + '</div>' +
+          '<label>Booking name</label>' +
+          '<input type="text" class="g-name" placeholder="e.g. Smith Family" value="' + escapeAttr(g.name || '') + '">' +
+          '<div class="grid2">' +
+            '<div><label>People in group</label>' +
+              '<input type="number" min="0" class="g-people" placeholder="0" value="' + (g.people != null ? g.people : '') + '"></div>' +
+            '<div><label>Rods rented</label>' +
+              '<input type="number" min="0" class="g-rods" placeholder="0" value="' + (g.rods != null ? g.rods : '') + '"></div>' +
+          '</div>' +
+          '<label>Outstanding balance ($)</label>' +
+          '<input type="number" min="0" step="0.01" class="g-balance" placeholder="0.00" value="' + (g.balance != null ? g.balance : '') + '">';
+        groupsContainer.appendChild(block);
+      }
+      updateSaveEnabled();
+    }
+
+    function collectGroups() {
+      var blocks = groupsContainer.querySelectorAll('.group-block');
+      var groups = [];
+      blocks.forEach(function (b) {
+        groups.push({
+          name: b.querySelector('.g-name').value.trim(),
+          people: Number(b.querySelector('.g-people').value) || 0,
+          rods: Number(b.querySelector('.g-rods').value) || 0,
+          balance: Number(b.querySelector('.g-balance').value) || 0
+        });
+      });
+      return groups;
+    }
+
+    function updateSaveEnabled() {
+      var hasDate = !!tripDateEl.value;
+      var hasCount = !!groupCountEl.value;
+      saveBtn.disabled = !(hasDate && hasCount);
+    }
+
+    groupCountEl.addEventListener('change', function () {
+      renderGroupBlocks(Number(groupCountEl.value) || 0);
+    });
+    tripDateEl.addEventListener('change', updateSaveEnabled);
+    groupsContainer.addEventListener('input', updateSaveEnabled);
+
+    saveBtn.addEventListener('click', async function () {
+      var date = tripDateEl.value;
+      var groups = collectGroups();
+      if (!date || groups.length === 0) return;
+      for (var i = 0; i < groups.length; i++) {
+        if (!groups[i].name) {
+          showToast('Enter a booking name for group ' + (i + 1));
+          return;
+        }
+      }
+      var notes = tripNotesEl.value.trim();
+      var trip = { date: date, groups: groups, groupCount: groups.length, notes: notes };
+
+      saveBtn.disabled = true;
+      saveBtn.textContent = 'Saving…';
+      try {
+        await upsertTrip(trip);
+        showToast('Trip saved for ' + fmtDateDisplay(date));
+        resetForm();
+        await refreshTrips();
+      } catch (err) {
+        showToast('Could not save: ' + (err && err.message ? err.message : 'error'));
+      } finally {
+        saveBtn.textContent = 'Save Trip';
+        updateSaveEnabled();
+      }
+    });
+
+    function resetForm() {
+      tripDateEl.value = todayStr;
+      tripNotesEl.value = '';
+      groupCountEl.value = '';
+      groupsContainer.innerHTML = '';
+      updateSaveEnabled();
+    }
+
+    // ---- list & detail ----
+    function renderTripList(list) {
+      if (!list.length) {
+        tripListEl.innerHTML = '<div class="empty">No trips recorded yet.</div>';
+        return;
+      }
+      tripListEl.innerHTML = '';
+      list.forEach(function (trip) {
+        var groups = trip.groups || [];
+        var totalPeople = groups.reduce(function (s, g) { return s + (Number(g.people) || 0); }, 0);
+        var totalRods = groups.reduce(function (s, g) { return s + (Number(g.rods) || 0); }, 0);
+        var totalBalance = groups.reduce(function (s, g) { return s + (Number(g.balance) || 0); }, 0);
+
+        var item = document.createElement('div');
+        item.className = 'trip-item';
+        item.innerHTML =
+          '<div class="trip-top">' +
+            '<span class="trip-date">' + escapeHtml(fmtDateDisplay(trip.date)) + '</span>' +
+            '<span class="trip-balance ' + (totalBalance > 0 ? 'owing' : 'clear') + '">' + fmtMoney(totalBalance) + (totalBalance > 0 ? ' owing' : ' clear') + '</span>' +
+          '</div>' +
+          '<div class="trip-meta">' + groups.length + ' group' + (groups.length === 1 ? '' : 's') + ' · ' + totalPeople + ' people · ' + totalRods + ' rods rented' + (trip.notes ? ' · 📝 note' : '') + '</div>';
+        item.addEventListener('click', function () { openDetailModal(trip); });
+        tripListEl.appendChild(item);
+      });
+    }
+
+    function renderCurrentList() {
+      var q = searchDateEl.value;
+      renderTripList(q ? allTrips.filter(function (t) { return t.date === q; }) : allTrips);
+    }
+
+    function openDetailModal(trip) {
+      var groups = trip.groups || [];
+      var rowsHtml = groups.map(function (g) {
+        return '<div><strong>' + escapeHtml(g.name) + '</strong> — ' + g.people + ' people, ' + g.rods + ' rods, ' + fmtMoney(g.balance) + ' outstanding</div>';
+      }).join('');
+
+      var backdrop = document.createElement('div');
+      backdrop.className = 'modal-backdrop';
+      backdrop.innerHTML =
+        '<div class="modal" style="position:relative;">' +
+          '<button class="close-x" id="closeModal">✕</button>' +
+          '<h2>' + escapeHtml(fmtDateDisplay(trip.date)) + '</h2>' +
+          '<div class="detail-groups">' + rowsHtml + '</div>' +
+          (trip.notes ? '<div style="margin-top:12px;padding:10px 12px;background:var(--bg);border:1px solid var(--line);border-radius:8px;font-size:13px;white-space:pre-wrap;">' + escapeHtml(trip.notes) + '</div>' : '') +
+          '<div class="row-actions">' +
+            '<button class="btn-secondary" id="editTripBtn" style="flex:1;">Edit</button>' +
+            '<button class="btn-danger-outline" id="deleteTripBtn" style="flex:1;">Delete Trip</button>' +
+          '</div>' +
+        '</div>';
+      modalRoot.appendChild(backdrop);
+
+      backdrop.addEventListener('click', function (e) { if (e.target === backdrop) closeModal(); });
+      backdrop.querySelector('#closeModal').addEventListener('click', closeModal);
+
+      backdrop.querySelector('#editTripBtn').addEventListener('click', function () {
+        closeModal();
+        loadIntoForm(trip);
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      });
+
+      backdrop.querySelector('#deleteTripBtn').addEventListener('click', async function () {
+        if (!confirm('Delete the trip recorded for ' + fmtDateDisplay(trip.date) + '? This cannot be undone.')) return;
+        try {
+          await deleteTripRow(trip.date);
+          showToast('Trip deleted');
+          closeModal();
+          await refreshTrips();
+        } catch (err) {
+          showToast('Could not delete: ' + (err && err.message ? err.message : 'error'));
+        }
+      });
+
+      function closeModal() { modalRoot.innerHTML = ''; }
+    }
+
+    function loadIntoForm(trip) {
+      tripDateEl.value = trip.date;
+      tripNotesEl.value = trip.notes || '';
+      var count = (trip.groups || []).length;
+      groupCountEl.value = String(count);
+      renderGroupBlocks(count, trip.groups);
+      updateSaveEnabled();
+    }
+
+    // ---- search ----
+    searchDateEl.addEventListener('change', renderCurrentList);
+    clearSearchBtn.addEventListener('click', function () {
+      searchDateEl.value = '';
+      renderCurrentList();
+    });
+
+    // ---- load ----
+    async function refreshTrips() {
+      try {
+        allTrips = await fetchTrips();
+        statusEl.textContent = 'synced';
+        renderCurrentList();
+      } catch (err) {
+        statusEl.textContent = 'sync error';
+        tripListEl.innerHTML = '<div class="empty">Could not load trips (' + (err && err.message ? err.message : 'error') + ').</div>';
+      }
+    }
+
+    updateSaveEnabled();
+    refreshTrips();
+  }
+})();
+</script>
+</body>
+</html>
