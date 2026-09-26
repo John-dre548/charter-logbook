@@ -82,6 +82,11 @@
   .detail-groups div { padding: 3px 0; border-top: 1px dashed var(--line); }
   .detail-groups div:first-child { border-top: none; }
   .empty { text-align: center; color: var(--sub); font-size: 14px; padding: 30px 10px; }
+  .draft-item { display: flex; justify-content: space-between; align-items: center; gap: 10px; border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; margin-bottom: 8px; cursor: pointer; background: var(--bg); }
+  .draft-item:active { background: var(--brand-light); }
+  .draft-item .draft-date { font-weight: 700; font-size: 14px; }
+  .draft-item .draft-meta { font-size: 12px; color: var(--sub); }
+  .draft-item .draft-discard { background: transparent; color: var(--danger); border: none; padding: 6px 8px; font-size: 12px; }
   .page-nav { display: flex; gap: 8px; margin-bottom: 16px; }
   .nav-btn { flex: 1; background: var(--card); color: var(--sub); border: 1px solid var(--line); padding: 10px; font-weight: 600; }
   .nav-btn.active { background: var(--brand); color: #fff; border-color: var(--brand); }
@@ -136,6 +141,11 @@
   </nav>
 
   <div id="pageNew">
+    <div class="card" id="draftsCard" style="display:none;">
+      <h2>Unfinished Trips</h2>
+      <div id="draftsList"></div>
+    </div>
+
     <div class="card">
       <h2>New Trip Entry</h2>
       <label for="tripDate">Date of trip</label>
@@ -250,6 +260,8 @@
     var completeBtn = document.getElementById('completeBtn');
     var startNewBtn = document.getElementById('startNewBtn');
     var draftIndicator = document.getElementById('draftIndicator');
+    var draftsCard = document.getElementById('draftsCard');
+    var draftsList = document.getElementById('draftsList');
     var tripListEl = document.getElementById('tripList');
     var searchDateEl = document.getElementById('searchDate');
     var clearSearchBtn = document.getElementById('clearSearch');
@@ -305,11 +317,10 @@
       return (res.data || []).map(rowToTrip);
     }
 
-    async function fetchActiveDraft() {
-      var res = await supabase.from('trips').select('*').eq('status', 'draft').order('updated_at', { ascending: false }).limit(1);
+    async function fetchDraftTrips() {
+      var res = await supabase.from('trips').select('*').eq('status', 'draft').order('updated_at', { ascending: false });
       if (res.error) throw res.error;
-      var rows = res.data || [];
-      return rows.length ? rowToTrip(rows[0]) : null;
+      return (res.data || []).map(rowToTrip);
     }
 
     // Saves the currently-open trip. Inserts a new draft the first time,
@@ -424,6 +435,8 @@
         showToast(saved.status === 'completed' ? 'Trip updated' : 'Trip saved — keep editing, or mark it complete when ready');
         if (saved.status === 'completed') {
           await refreshCompletedTrips();
+        } else {
+          await refreshDrafts();
         }
       } catch (err) {
         showToast('Could not save: ' + (err && err.message ? err.message : 'error'));
@@ -453,6 +466,7 @@
         showToast('Trip completed and added to All Trips');
         resetForm();
         await refreshCompletedTrips();
+        await refreshDrafts();
       } catch (err) {
         showToast('Could not complete trip: ' + (err && err.message ? err.message : 'error'));
       } finally {
@@ -596,6 +610,60 @@
       renderCurrentList();
     });
 
+    // ---- drafts (unfinished trips) ----
+    function renderDrafts(drafts) {
+      if (!drafts.length) {
+        draftsCard.style.display = 'none';
+        draftsList.innerHTML = '';
+        return;
+      }
+      draftsCard.style.display = 'block';
+      draftsList.innerHTML = '';
+      drafts.forEach(function (trip) {
+        var groups = trip.groups || [];
+        var namedGroups = groups.filter(function (g) { return g.name; });
+        var previewBits = [];
+        if (groups.length) previewBits.push(groups.length + ' group' + (groups.length === 1 ? '' : 's'));
+        if (namedGroups.length) previewBits.push(namedGroups.map(function (g) { return g.name; }).join(', '));
+        var preview = previewBits.length ? previewBits.join(' · ') : 'No details entered yet';
+
+        var item = document.createElement('div');
+        item.className = 'draft-item';
+        item.innerHTML =
+          '<div>' +
+            '<div class="draft-date">' + escapeHtml(fmtDateDisplay(trip.date)) + '</div>' +
+            '<div class="draft-meta">' + escapeHtml(preview) + '</div>' +
+          '</div>' +
+          '<button class="draft-discard" type="button">Discard</button>';
+        item.addEventListener('click', function () {
+          loadIntoForm(trip);
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+        });
+        item.querySelector('.draft-discard').addEventListener('click', async function (e) {
+          e.stopPropagation();
+          if (!confirm('Discard this unfinished trip? This cannot be undone.')) return;
+          try {
+            await deleteTripRow(trip.id);
+            if (currentTrip && currentTrip.id === trip.id) resetForm();
+            showToast('Draft discarded');
+            await refreshDrafts();
+          } catch (err) {
+            showToast('Could not discard: ' + (err && err.message ? err.message : 'error'));
+          }
+        });
+        draftsList.appendChild(item);
+      });
+    }
+
+    async function refreshDrafts() {
+      try {
+        var drafts = await fetchDraftTrips();
+        renderDrafts(drafts);
+      } catch (err) {
+        // non-fatal — the drafts section just stays hidden/stale
+      }
+    }
+
     // ---- load ----
     async function refreshCompletedTrips() {
       try {
@@ -611,6 +679,7 @@
     updateSaveEnabled();
     updateDraftUI();
     refreshCompletedTrips();
+    refreshDrafts();
   }
 })();
 </script>
