@@ -608,19 +608,9 @@
       }
     }
 
-    async function loadExistingDraftIfAny() {
-      try {
-        var draft = await fetchActiveDraft();
-        if (draft) loadIntoForm(draft);
-      } catch (err) {
-        // non-fatal — user can still start a fresh trip
-      }
-    }
-
     updateSaveEnabled();
     updateDraftUI();
     refreshCompletedTrips();
-    loadExistingDraftIfAny();
   }
 })();
 </script>
